@@ -238,6 +238,10 @@ func (b *BigNumber) additional(flag string) (string, error) {
 		istr = tmpStr + istr
 	}
 
+	if op == 1 {
+		istr = "1" + istr
+	}
+
 	if it, iok := strconv.Atoi(istr); it == 0 || iok != nil {
 		istr = "0"
 	} else {
