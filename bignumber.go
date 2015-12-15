@@ -2,7 +2,7 @@ package bnlmz
 
 import (
 	// "errors"
-	"fmt"
+	// "fmt"
 	"regexp"
 	"strconv"
 	// "strings"
@@ -168,8 +168,6 @@ func (b *BigNumber) Add(numA, numB string) string {
 	absB := b.Abs(numB)
 	cmp := b.Cmp(absA, absB)
 
-	fmt.Println("Cmp => ", cmp)
-
 	if cmp == 0 {
 		return "0"
 	}
@@ -178,8 +176,6 @@ func (b *BigNumber) Add(numA, numB string) string {
 		return typeA + b.additional(numA, numB, false)
 	}
 
-	fmt.Println("TypeB => ", typeB)
-	fmt.Println("TypeA => ", typeA)
 	return typeB + b.additional(numB, numA, false)
 }
 
@@ -189,6 +185,56 @@ func (b *BigNumber) Sub(numA, numB string) string {
 	}
 
 	return b.Add(numA, "-"+numB)
+}
+
+func (b *BigNumber) Mul(numA, numB string) string {
+	muls := make(map[int]string)
+	result := ""
+	tmpNum := ""
+	typed := ""
+	tmp := "0"
+	typeA, intA, floatA := b.Parse(numA)
+	typeB, intB, floatB := b.Parse(numB)
+
+	if b.checkZero(intA) == "0" && b.checkZero(floatA) == "0" {
+		return "0"
+	}
+
+	if b.checkZero(intB) == "0" && b.checkZero(floatB) == "0" {
+		return "0"
+	}
+
+	flenA := len(floatA)
+	flenB := len(floatB)
+	ilenB := len(intB)
+	lens := ilenB + flenB
+
+	if typeA != typeB {
+		typed = "-"
+	}
+
+	muls[0] = "0"
+	for i := 1; i < 10; i++ {
+		muls[i] = b.Add(muls[i-1], intA+floatA)
+	}
+
+	mulNum := intB + floatB
+	for i := lens - 1; i >= 0; i-- {
+		index, _ := strconv.Atoi(string(mulNum[i]))
+		tmpNum = muls[index]
+		for j, jlen := 0, lens-1-i; j < jlen; j++ {
+			tmpNum = tmpNum + "0"
+		}
+		tmp = b.Add(tmp, tmpNum)
+	}
+
+	if b.checkZero(tmp) == "0" {
+		return "0"
+	}
+
+	result = typed + tmp[0:len(tmp)-(flenA+flenB)] + "." + tmp[len(tmp)-(flenA+flenB):]
+
+	return result
 }
 
 func (b *BigNumber) additional(numA, numB string, flag bool) string {
@@ -218,8 +264,6 @@ func (b *BigNumber) additional(numA, numB string, flag bool) string {
 		typed = -1
 	}
 
-	fmt.Println("ilenA =>", ilenA)
-	fmt.Println("ilenB =>", ilenB)
 	if ilenA > ilenB {
 		for i, lens := 0, ilenA-ilenB; i < lens; i++ {
 			intB = "0" + intB

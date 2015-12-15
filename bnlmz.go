@@ -19,3 +19,8 @@ func Sub(numA, numB string) string {
 	bn := BigNumber{}
 	return bn.Sub(numA, numB)
 }
+
+func Mul(numA, numB string) string {
+	bn := BigNumber{}
+	return bn.Mul(numA, numB)
+}
