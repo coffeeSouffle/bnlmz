@@ -1,185 +1,259 @@
 package bnlmz
 
 import (
-	"errors"
-	// "fmt"
+	// "errors"
+	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
+	// "strings"
 )
 
-// func Add(numA, numB string) (string, error) {
-
-// }
-
-// func Sub(numA, numB string) (string, error) {
-
-// }
-
 type BigNumber struct {
-	NumA string
-	NumB string
-
-	intA   []string
-	intB   []string
-	floatA []string
-	floatB []string
-	typed  string
 }
 
-func (b *BigNumber) Parse(num string) (string, string, error) {
+func (b *BigNumber) checkZero(num string) string {
+	flag := false
 	str := ""
-	re := regexp.MustCompile(`([0-9]+)(.([0-9]+))?`)
+	for i, lens := 0, len(num); i < lens; i++ {
+		if string(num[i]) == "0" && !flag {
+			continue
+		}
+
+		flag = true
+		str = str + string(num[i])
+	}
+
+	if str == "" {
+		return "0"
+	}
+
+	return str
+}
+
+func (b *BigNumber) Parse(num string) (string, string, string) {
+	typed := ""
+	re := regexp.MustCompile(`([-|+])?([0-9]+)(.([0-9]+))?`)
 	match := re.FindStringSubmatch(num)
 
 	if match[0] != num {
-		err := errors.New("input error")
-		return str, str, err
+		panic("input data error")
 	}
 
-	if len(match) != 4 {
-		err := errors.New("struct error")
-		return str, str, err
+	if len(match) != 5 {
+		panic("input data error")
 	}
 
-	return match[1], match[3], nil
+	if match[1] == "+" {
+		typed = ""
+	} else {
+		typed = match[1]
+	}
+
+	return typed, match[2], match[4]
 }
 
-func (b *BigNumber) init(numA, numB string) error {
+func (b *BigNumber) set(num string) string {
+	typed, ints, floats := b.Parse(num)
 
-	b.NumA = numA
-	b.NumB = numB
+	ints = b.checkZero(ints)
 
-	intA, floatA, ok := b.Parse(b.NumA)
-	if ok != nil {
-		return ok
+	if len(floats) > 0 {
+		ints = ints + "." + floats
 	}
 
-	intB, floatB, ok := b.Parse(b.NumB)
-	if ok != nil {
-		return ok
+	return typed + ints
+}
+
+func (b *BigNumber) Cmp(numA, numB string) int {
+	typeA, intA, floatA := b.Parse(numA)
+	typeB, intB, floatB := b.Parse(numB)
+
+	if typeA != typeB {
+		if typeA == "-" {
+			return -1
+		}
+
+		return 1
 	}
 
-	intDiffLen := len(intA) - len(intB)
+	if intA == intB && floatA == floatB {
+		return 0
+	}
 
-	if intDiffLen > 0 {
-		for i := 0; i < intDiffLen; i++ {
+	if len(intA) > len(intB) {
+		if typeA == "-" {
+			return -1
+		}
+
+		return 1
+	}
+
+	if len(intA) < len(intB) {
+		if typeA == "-" {
+			return 1
+		}
+
+		return -1
+	}
+
+	if intA > intB {
+		if typeA == "-" {
+			return -1
+		}
+
+		return 1
+	}
+
+	if intA < intB {
+		if typeA == "-" {
+			return 1
+		}
+
+		return -1
+	}
+
+	if floatA > floatB {
+		if typeA == "-" {
+			return -1
+		}
+
+		return 1
+	}
+
+	if typeA == "-" {
+		return 1
+	}
+
+	return -1
+}
+
+func (b *BigNumber) Abs(num string) string {
+	_, ints, floats := b.Parse(num)
+
+	ints = b.checkZero(ints)
+
+	if len(floats) > 0 {
+		ints = ints + "." + floats
+	}
+
+	return ints
+}
+
+func (b *BigNumber) IsMinus(num string) bool {
+	typed, _, _ := b.Parse(num)
+	return (typed == "-")
+}
+
+func (b *BigNumber) Add(numA, numB string) string {
+	var (
+		result string
+		typeA  string
+		typeB  string
+	)
+
+	if b.IsMinus(numA) == true {
+		typeA = "-"
+	}
+
+	if b.IsMinus(numB) == true {
+		typeB = "-"
+	}
+
+	if typeA == typeB {
+		result = b.additional(numA, numB, true)
+		return typeA + result
+	}
+
+	absA := b.Abs(numA)
+	absB := b.Abs(numB)
+	cmp := b.Cmp(absA, absB)
+
+	fmt.Println("Cmp => ", cmp)
+
+	if cmp == 0 {
+		return "0"
+	}
+
+	if cmp == 1 {
+		return typeA + b.additional(numA, numB, false)
+	}
+
+	fmt.Println("TypeB => ", typeB)
+	fmt.Println("TypeA => ", typeA)
+	return typeB + b.additional(numB, numA, false)
+}
+
+func (b *BigNumber) Sub(numA, numB string) string {
+	if b.IsMinus(numB) == true {
+		return b.Add(numA, b.Abs(numB))
+	}
+
+	return b.Add(numA, "-"+numB)
+}
+
+func (b *BigNumber) additional(numA, numB string, flag bool) string {
+	var (
+		tmp  int
+		tmpA int
+		tmpB int
+
+		iRet string
+		fRet string
+
+		ilen int
+		flen int
+
+		ok error
+	)
+	_, intA, floatA := b.Parse(numA)
+	_, intB, floatB := b.Parse(numB)
+	ilenA := len(intA)
+	ilenB := len(intB)
+	flenA := len(floatA)
+	flenB := len(floatB)
+	op := 0
+	typed := 1
+
+	if !flag {
+		typed = -1
+	}
+
+	fmt.Println("ilenA =>", ilenA)
+	fmt.Println("ilenB =>", ilenB)
+	if ilenA > ilenB {
+		for i, lens := 0, ilenA-ilenB; i < lens; i++ {
 			intB = "0" + intB
 		}
-	} else if intDiffLen < 0 {
-		for i := 0; i < -1*intDiffLen; i++ {
+		ilen = ilenA
+	} else {
+		for i, lens := 0, ilenB-ilenA; i < lens; i++ {
 			intA = "0" + intA
 		}
-		b.typed = "-"
-	} else {
-		if intA == intB {
-			b.typed = "="
+		ilen = ilenB
+	}
+
+	if flenA > 0 || flenB > 0 {
+		if flenA > flenB {
+			for i, lens := 0, flenA-flenB; i < lens; i++ {
+				floatB = floatB + "0"
+			}
+			flen = flenA
 		} else {
-			for i := 0; i < len(intA); i++ {
-				if intB[i] > intA[i] {
-					b.typed = "-"
-					break
-				}
+			for i, lens := 0, flenB-flenA; i < lens; i++ {
+				floatA = floatA + "0"
 			}
-		}
-	}
-
-	floatDiffLen := len(floatA) - len(floatB)
-
-	if floatDiffLen > 0 {
-		for i := 0; i < floatDiffLen; i++ {
-			floatB = floatB + "0"
-		}
-	} else if floatDiffLen < 0 {
-		for i := 0; i < -1*floatDiffLen; i++ {
-			floatA = floatA + "0"
-		}
-	}
-
-	if b.typed == "=" {
-		for i := 0; i < len(floatA); i++ {
-			if floatB[i] > floatA[i] {
-				b.typed = "-"
-				break
-			}
+			flen = flenB
 		}
 
-		if b.typed == "=" {
-			b.typed = ""
-		}
-	}
+		for i := flen - 1; i >= 0; i-- {
+			tmpA, ok = strconv.Atoi(string(floatA[i]))
+			tmpB, ok = strconv.Atoi(string(floatB[i]))
 
-	if b.typed == "-" {
-		b.intA = strings.Split(intB, "")
-		b.intB = strings.Split(intA, "")
-		b.floatA = strings.Split(floatB, "")
-		b.floatB = strings.Split(floatA, "")
-	} else {
-		b.intA = strings.Split(intA, "")
-		b.intB = strings.Split(intB, "")
-		b.floatA = strings.Split(floatA, "")
-		b.floatB = strings.Split(floatB, "")
-	}
-
-	return nil
-}
-
-func (b *BigNumber) Add(numA, numB string) (string, error) {
-	if ok := b.init(numA, numB); ok != nil {
-		return "", ok
-	}
-
-	number, err := b.additional("+")
-
-	if err != nil {
-		return "", err
-	}
-
-	return number, nil
-}
-
-func (b *BigNumber) Sub(numA, numB string) (string, error) {
-	if ok := b.init(numA, numB); ok != nil {
-		return "", ok
-	}
-
-	number, err := b.additional("-")
-
-	if err != nil {
-		return "", err
-	}
-
-	return b.typed + number, nil
-}
-
-func (b *BigNumber) additional(flag string) (string, error) {
-	var (
-		str    string
-		istr   string
-		tmpA   int
-		tmpB   int
-		tmp    int
-		err    error
-		tmpStr string
-	)
-	operator := 1
-	op := 0
-	length := len(b.floatA)
-
-	if flag == "-" {
-		operator = -1
-	}
-
-	if length > 0 {
-		for i := length - 1; i >= 0; i-- {
-			tmpA, err = strconv.Atoi(b.floatA[i])
-			tmpB, err = strconv.Atoi(b.floatB[i])
-
-			if err != nil {
-				return "", err
+			if ok != nil {
+				panic("computing error")
 			}
 
-			tmp = tmpA + (operator * tmpB) + op
+			tmp = tmpA + (typed * tmpB) + op
 
 			if op == 1 || op == -1 {
 				op = 0
@@ -191,33 +265,27 @@ func (b *BigNumber) additional(flag string) (string, error) {
 			}
 
 			if tmp < 0 {
-				tmp = 10 + tmp
+				tmp = tmp + 10
 				op = -1
 			}
 
-			tmpStr = strconv.Itoa(tmp)
-			str = tmpStr + str
+			fRet = strconv.Itoa(tmp) + fRet
 		}
 
-		if ft, fok := strconv.Atoi(str); ft == 0 || fok != nil {
-			str = "0"
+		if num, _ := strconv.Atoi(fRet); num == 0 {
+			fRet = "0"
 		}
-
-		str = "." + str
 	}
 
-	length = len(b.intA)
+	for i := ilen - 1; i >= 0; i-- {
+		tmpA, ok = strconv.Atoi(string(intA[i]))
+		tmpB, ok = strconv.Atoi(string(intB[i]))
 
-	for i := length - 1; i >= 0; i-- {
-
-		tmpA, err = strconv.Atoi(b.intA[i])
-		tmpB, err = strconv.Atoi(b.intB[i])
-
-		if err != nil {
-			return "", err
+		if ok != nil {
+			panic("computing error")
 		}
 
-		tmp = tmpA + (operator * tmpB) + op
+		tmp = tmpA + (typed * tmpB) + op
 
 		if op == 1 || op == -1 {
 			op = 0
@@ -229,36 +297,22 @@ func (b *BigNumber) additional(flag string) (string, error) {
 		}
 
 		if tmp < 0 {
-			tmp = 10 + tmp
+			tmp = tmp + 10
 			op = -1
 		}
 
-		tmpStr = strconv.Itoa(tmp)
-
-		istr = tmpStr + istr
+		iRet = strconv.Itoa(tmp) + iRet
 	}
 
 	if op == 1 {
-		istr = "1" + istr
+		iRet = "1" + iRet
 	}
 
-	if it, iok := strconv.Atoi(istr); it == 0 || iok != nil {
-		istr = "0"
-	} else {
-		istr = strconv.Itoa(it)
+	iRet = b.checkZero(iRet)
+
+	if len(fRet) > 0 {
+		return iRet + "." + fRet
 	}
 
-	str = istr + str
-
-	return str, nil
-}
-
-func Add(numA, numB string) (string, error) {
-	bn := BigNumber{}
-	return bn.Add(numA, numB)
-}
-
-func Sub(numA, numB string) (string, error) {
-	bn := BigNumber{}
-	return bn.Sub(numA, numB)
+	return iRet
 }
